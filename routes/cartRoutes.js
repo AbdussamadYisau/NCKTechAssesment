@@ -1,42 +1,19 @@
 const Cart = require("../model/cartsDB");
 const express = require("express");
 const router = express.Router();
-const {
-  requireSignin,
-  userMiddleware,
-  adminMiddleware,
-} = require("../middleware");
+const { requireSignin, userMiddleware } = require("../middleware");
 const InventoriesModel = require("../model/inventoriesDB");
 
 function runUpdate(condition, updateData) {
   return new Promise((resolve, reject) => {
     //you update code here
-
     Cart.findOneAndUpdate(condition, updateData, { upsert: true })
       .then((result) => resolve())
       .catch((err) => reject(err));
   });
 }
 
-const getInventories = (req, res) => {
-  InventoriesModel.find()
-    .exec()
-    .then((inventories) => {
-      return res.status(200).json({
-        message: "Inventories retrieved successfully",
-        data: inventories,
-        count: inventories.length,
-      });
-    })
-    .catch((error) => {
-      return res.status(500).json({
-        message: "There was an error with this request",
-        error: error.message,
-      });
-    });
-};
-
-const addItemToCart = (req, res) => {
+const addItemToCart = async (req, res) => {
   Cart.findOne({ user: req.user._id }).exec((error, cart) => {
     if (error) return res.status(400).json({ error });
     if (cart) {
@@ -45,7 +22,28 @@ const addItemToCart = (req, res) => {
 
       const shoppingCart = req.body.cartItems;
 
-      shoppingCart.forEach((cartItem) => {
+      shoppingCart.forEach(async (cartItem) => {
+        const quantity = await InventoriesModel.findById(cartItem?.inventory);
+        const initialCart = await Cart.findOne({ user: req.user._id });
+        let initialQuantity = 0;
+
+        for (let x in initialCart.cartItems) {
+          if (initialCart.cartItems[x].inventory == cartItem.inventory) {
+            initialQuantity = initialCart.cartItems[x].quantity;
+          }
+        }
+        const updatedInventoryQuantity = quantity.quantity + initialQuantity;
+        const newQuantity = updatedInventoryQuantity - cartItem.quantity;
+        await InventoriesModel.updateOne(
+          {
+            quantity: quantity.quantity,
+          },
+          {
+            $set: {
+              quantity: newQuantity,
+            },
+          }
+        );
         const inventory = cartItem.inventory;
         const item = cart.cartItems.find((c) => c.inventory == inventory);
         let condition, update;
@@ -67,19 +65,45 @@ const addItemToCart = (req, res) => {
         promiseArray.push(runUpdate(condition, update));
       });
       Promise.all(promiseArray)
-        .then((response) => res.status(201).json({ response }))
+        .then((response) => {
+          res.status(201).json({
+            message: "Added to cart sucessfully",
+          });
+        })
         .catch((error) => res.status(400).json({ error }));
     } else {
       //if cart not exist then create a new cart
+      const shoppingCart = req.body.cartItems;
       const cart = new Cart({
         user: req.user._id,
-        cartItems: req.body.cartItems,
+        cartItems: shoppingCart,
       });
       cart.save((error, cart) => {
         if (error) return res.status(400).json({ error });
         if (cart) {
-          return res.status(201).json({ cart });
+          return res.status(201).json({
+            message: "Added to cart successfully",
+            cart,
+          });
         }
+      });
+
+      shoppingCart.forEach(async (cartItem) => {
+        const quantity = await InventoriesModel.findById(cartItem?.inventory);
+
+        const updatedInventoryQuantity = quantity.quantity;
+        console.log("Updated Quantity", updatedInventoryQuantity);
+        const newQuantity = updatedInventoryQuantity - cartItem.quantity;
+        await InventoriesModel.updateOne(
+          {
+            quantity: quantity.quantity,
+          },
+          {
+            $set: {
+              quantity: newQuantity,
+            },
+          }
+        );
       });
     }
   });
@@ -130,6 +154,6 @@ const removeCartItems = (req, res) => {
 
 router.post("/users/add-to-cart", requireSignin, userMiddleware, addItemToCart);
 
-router.get("/cart", requireSignin, userMiddleware, getCartItems);
+router.get("/users/cart", requireSignin, userMiddleware, getCartItems);
 
 module.exports = router;

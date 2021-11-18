@@ -55,6 +55,12 @@ const connectDB = async () => {
       useUnifiedTopology: true,
     });
     console.log("MongoDB Connected.");
+    // Listening port
+    app.listen(process.env.PORT || 3030, () => {
+      console.log(
+        `This application is running on port ${process.env.PORT || 3030} `
+      );
+    });
   } catch (err) {
     console.log(err.message);
     process.exit(1);
@@ -62,10 +68,3 @@ const connectDB = async () => {
 };
 
 connectDB();
-
-// Listening port
-app.listen(process.env.PORT || 3030, () => {
-  console.log(
-    `This application is running on port ${process.env.PORT || 3030} `
-  );
-});
