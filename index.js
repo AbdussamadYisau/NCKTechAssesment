@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const userAuthRoutes = require("./routes/userAuthRoutes");
 const inventoriesRoutes = require("./routes/inventoriesRoute");
+const cartRoutes = require("./routes/cartRoutes");
+
 require("dotenv/config");
 
 // body parser
@@ -27,6 +29,7 @@ app.use((req, res, next) => {
 app.use("/v1", userAuthRoutes);
 app.use("/v1", inventoriesRoutes);
 app.use("/v1", adminAuthRoutes);
+app.use("/v1", cartRoutes);
 
 // app.use("/uploads", express.static("./uploads"));
 
